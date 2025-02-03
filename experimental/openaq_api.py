@@ -4,8 +4,9 @@ import numpy as np
 import pandas as pd
 from openaq import OpenAQ
 
-# Replace with your OpenAQ API key
-API_KEY = "your-api-key"
+# Put your OpenAQ API key in a text file with the name "openaq_api_key.txt"
+with open("api_keys/openaq_api_key.txt", "r") as file:
+    API_KEY = file.read()
 
 # Parameters
 RADIUS = 10_000
