@@ -2,4 +2,5 @@ numpy
 matplotlib
 openaq
 pandas
+scikit-learn
 torch
