@@ -1,6 +1,7 @@
 numpy
 matplotlib
 openaq
+optuna
 pandas
 scikit-learn
 torch
