@@ -1,7 +1,8 @@
 # User added
-api_keys/*
+api_keys/
 !api_keys/.gitkeep
 540_env/
+data/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
