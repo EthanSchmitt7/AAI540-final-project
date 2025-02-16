@@ -11,6 +11,7 @@ from sklearn.preprocessing import StandardScaler
 TRAIN_SPLIT = 0.7
 VAL_SPLIT = 0.15
 TEST_SPLIT = 0.15
+TARGET_PARAM = "pm25"
 
 base_dir = "/opt/ml/processing"
 
@@ -19,15 +20,16 @@ df_location = pd.read_csv(
 )
 
 # Split training
-train_data = df_location.iloc[:int(len(df_location) * TRAIN_SPLIT)]
+df_param = df_location[df_location['parameter'] == TARGET_PARAM]  # Filter data for this parameter
+train_data = df_param.iloc[:int(len(df_param) * TRAIN_SPLIT)]
 train_data = train_data.reset_index(drop=True)
 
 # Split validation
-val_data = df_location.iloc[int(len(df_location) * TRAIN_SPLIT):int(len(df_location) * TRAIN_SPLIT) + int(len(df_location) * VAL_SPLIT)]
+val_data = df_param.iloc[int(len(df_param) * TRAIN_SPLIT):int(len(df_param) * TRAIN_SPLIT) + int(len(df_param) * VAL_SPLIT)]
 val_data = val_data.reset_index(drop=True)
 
 # Split testing
-test_data = df_location.iloc[int(len(df_location) * TRAIN_SPLIT) + int(len(df_location) * VAL_SPLIT):int(len(df_location) * TRAIN_SPLIT) + int(len(df_location) * VAL_SPLIT) + int(len(df_location) * TEST_SPLIT)]
+test_data = df_param.iloc[int(len(df_param) * TRAIN_SPLIT) + int(len(df_param) * VAL_SPLIT):int(len(df_param) * TRAIN_SPLIT) + int(len(df_param) * VAL_SPLIT) + int(len(df_param) * TEST_SPLIT)]
 test_data = test_data.reset_index(drop=True)
 
 # Normalize the training dataset
