@@ -8,7 +8,7 @@ from torch import nn, optim
 from torch.utils.data import DataLoader, Dataset
 
 # ---------------------------
-# 1) Dataset definition
+# Dataset definition
 # ---------------------------
 class TimeSeriesDataset(Dataset):
     def __init__(self, data, seq_len=30, pred_len=1):
@@ -18,16 +18,16 @@ class TimeSeriesDataset(Dataset):
         - seq_len (int): Number of timesteps in the input sequence
         - pred_len (int): Number of timesteps in the output sequence
         """
-        # Expecting a df with at least one column named "value"
         self.data = np.array(data["value"]) if isinstance(data, pd.DataFrame) else np.array(data)
         self.seq_len = seq_len
         self.pred_len = pred_len
 
     def __len__(self):
-        # e.g. if data has 100 points, and seq_len=30, pred_len=1 -> total sequences ~ 69
+        """Returns total number of sequences available"""
         return max(0, len(self.data) - self.seq_len - self.pred_len)
 
     def __getitem__(self, idx):
+        """Retrieves input sequence and target sequence"""
         if idx >= len(self):
             raise IndexError(f"Index {idx} out of bounds for dataset length {len(self)}")
 
@@ -38,7 +38,7 @@ class TimeSeriesDataset(Dataset):
         return torch.tensor(x, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)
 
 # ---------------------------
-# 2) Model definition
+# Model definition
 # ---------------------------
 class LSTM(nn.Module):
     def __init__(self, input_size=1, hidden_size=50, num_layers=1):
@@ -66,7 +66,7 @@ class LSTM(nn.Module):
         return out
 
 # ---------------------------
-# 3) Main training function
+# Main training function
 # ---------------------------
 def main():
     parser = argparse.ArgumentParser()
@@ -88,9 +88,9 @@ def main():
     args = parser.parse_args()
 
     # ---------------------------
-    # 3a) Load data
+    # Load data
     # ---------------------------
-    # We assume your processor wrote "train.csv", "validation.csv", and "test.csv"
+    # Processor wrote "train.csv", "validation.csv", and "test.csv"
     # into the respective directories: /opt/ml/input/data/train, etc.
     train_csv = os.path.join(args.train, "train.csv")
     val_csv   = os.path.join(args.validation, "validation.csv")
@@ -101,7 +101,7 @@ def main():
     test_data  = pd.read_csv(test_csv)
 
     # ---------------------------
-    # 3b) Create PyTorch datasets & loaders
+    # Create PyTorch datasets & loaders
     # ---------------------------
     train_dataset = TimeSeriesDataset(train_data, seq_len=args.seq_len, pred_len=args.pred_len)
     val_dataset   = TimeSeriesDataset(val_data, seq_len=args.seq_len, pred_len=args.pred_len)
@@ -112,7 +112,7 @@ def main():
     test_loader  = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
     # ---------------------------
-    # 3c) Initialize model, loss, optimizer
+    # Initialize model, loss, optimizer
     # ---------------------------
     model = LSTM(
         input_size=1,
@@ -124,7 +124,7 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
     # ---------------------------
-    # 3d) Training Loop
+    # Training Loop
     # ---------------------------
     for epoch in range(args.epochs):
         # Training
@@ -148,26 +148,24 @@ def main():
                 val_loss += criterion(val_outputs, val_targets).item()
         val_loss /= len(val_loader)
 
+        # Test
+        model.eval()
+        test_loss = 0.0
+        with torch.no_grad():
+            for test_inputs, test_targets in test_loader:
+                test_outputs = model(test_inputs)
+                test_loss += criterion(test_outputs, test_targets).item()
+        test_loss /= len(test_loader)
+
         print(f"Epoch [{epoch+1}/{args.epochs}] "
-              f"Train Loss: {train_loss:.4f} "
-              f"Val Loss: {val_loss:.4f}")
-
+              f"TrainLoss: {train_loss:.4f} "
+              f"ValLoss: {val_loss:.4f} "
+              f"TestLoss: {test_loss:.4f}")
+        
     # ---------------------------
-    # 3e) (Optional) Test evaluation
+    # Save the model
     # ---------------------------
-    model.eval()
-    test_loss = 0.0
-    with torch.no_grad():
-        for test_inputs, test_targets in test_loader:
-            test_outputs = model(test_inputs)
-            test_loss += criterion(test_outputs, test_targets).item()
-    test_loss /= len(test_loader)
-    print(f"Final Test Loss: {test_loss:.4f}")
-
-    # ---------------------------
-    # 3f) Save the model
-    # ---------------------------
-    # SageMaker automatically uploads /opt/ml/model to S3 after training
+    # Uploads /opt/ml/model to S3 after training
     model_dir = os.environ.get("SM_MODEL_DIR", "/opt/ml/model")
     model_path = os.path.join(model_dir, "model.pt")
     torch.save(model.state_dict(), model_path)
