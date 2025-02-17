@@ -42,9 +42,6 @@ class TimeSeriesDataset(Dataset):
 # ---------------------------
 class LSTM(nn.Module):
     def __init__(self, input_size=1, hidden_size=50, num_layers=1):
-        """
-        A simple LSTM for univariate time series prediction.
-        """
         super(LSTM, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
@@ -52,10 +49,6 @@ class LSTM(nn.Module):
         self.fc = nn.Linear(hidden_size, 1)
 
     def forward(self, x):
-        """
-        x: shape (batch_size, seq_len)
-        We'll unsqueeze(-1) to get (batch_size, seq_len, input_size=1).
-        """
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size)
         c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size)
         out, _ = self.lstm(x.unsqueeze(-1), (h0, c0))
