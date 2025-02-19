@@ -12,6 +12,7 @@ session = boto3.Session()
 region_name = session.region_name  # Dynamically get region from the AWS environment
 cloudwatch = boto3.client("cloudwatch", region_name=region_name)  # Change region as needed
 
+
 class LSTM(nn.Module):
     def __init__(self, input_size=1, hidden_size=50, num_layers=1):
         super(LSTM, self).__init__()
@@ -28,49 +29,35 @@ class LSTM(nn.Module):
         out = self.fc(out)
         return out
 
+
 def model_fn(model_dir):
-    model = LSTM(input_size=1, hidden_size=50, num_layers=1)
+    model = LSTM(input_size=1, hidden_size=80, num_layers=2)
     model_path = os.path.join(model_dir, "model.pt")
     model.load_state_dict(torch.load(model_path, map_location=torch.device("cpu")))
     model.eval()
     return model
 
+
 def input_fn(request_body, request_content_type):
     if request_content_type == "application/json":
         data = json.loads(request_body)["data"]
         inputs = torch.tensor([data], dtype=torch.float32)
-        
-        # Log raw input data to CloudWatch
-        cloudwatch.put_metric_data(
-            Namespace="AirQualityMonitoring",
-            MetricData=[
-                {
-                    "MetricName": "RawQueriedPM25Value",
-                    "Unit": "None",
-                    "Value": data  # Log the raw input value as received
-                }
-            ]
-        )
-        
+
         return inputs
     else:
         raise ValueError(f"Unsupported content type: {request_content_type}")
+
 
 def predict_fn(input_object, model):
     start_time = time.time()
     with torch.no_grad():
         preds = model(input_object)
     inference_time = time.time() - start_time
-    
+
     # Log prediction latency
     cloudwatch.put_metric_data(
         Namespace="AirQualityMonitoring",
         MetricData=[
-            {
-                "MetricName": "InputPM25Value",
-                "Unit": "None",
-                "Value": input_value[0] if isinstance(input_value, list) else input_value
-            },
             {
                 "MetricName": "InferenceLatency",
                 "Unit": "Milliseconds",
@@ -78,13 +65,13 @@ def predict_fn(input_object, model):
             }
         ]
     )
-    
     return preds
+
 
 def output_fn(prediction, response_content_type):
     if response_content_type == "application/json":
         result = prediction.squeeze().item()
-        
+
         # Log prediction value
         cloudwatch.put_metric_data(
             Namespace="AirQualityMonitoring",
@@ -96,7 +83,6 @@ def output_fn(prediction, response_content_type):
                 }
             ]
         )
-        
         return json.dumps({"prediction": result})
     else:
         raise ValueError(f"Unsupported response content type: {response_content_type}")
