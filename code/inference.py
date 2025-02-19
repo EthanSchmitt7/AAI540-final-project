@@ -64,11 +64,17 @@ def predict_fn(input_object, model):
     with torch.no_grad():
         preds = model(input_object)
     inference_time = time.time() - start_time
+    input_value = input_object.squeeze().tolist()
 
     # Log prediction latency and input to model
     cloudwatch.put_metric_data(
         Namespace="AirQualityMonitoring",
         MetricData=[
+            {
+                "MetricName": "InputPM25Value",
+                "Unit": "None",
+                "Value": input_value[0] if isinstance(input_value, list) else input_value
+            },
             {
                 "MetricName": "InferenceLatency",
                 "Unit": "Milliseconds",
