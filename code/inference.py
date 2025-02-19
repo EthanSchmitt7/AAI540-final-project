@@ -43,6 +43,17 @@ def input_fn(request_body, request_content_type):
         data = json.loads(request_body)["data"]
         inputs = torch.tensor([data], dtype=torch.float32)
 
+        # Log raw input data to CloudWatch
+        cloudwatch.put_metric_data(
+            Namespace="AirQualityMonitoring",
+            MetricData=[
+                {
+                    "MetricName": "RawQueriedPM25Value",
+                    "Unit": "None",
+                    "Value": data[0]
+                }
+            ]
+        )
         return inputs
     else:
         raise ValueError(f"Unsupported content type: {request_content_type}")
@@ -54,7 +65,7 @@ def predict_fn(input_object, model):
         preds = model(input_object)
     inference_time = time.time() - start_time
 
-    # Log prediction latency
+    # Log prediction latency and input to model
     cloudwatch.put_metric_data(
         Namespace="AirQualityMonitoring",
         MetricData=[
