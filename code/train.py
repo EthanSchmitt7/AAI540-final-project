@@ -1,4 +1,5 @@
 
+import shutil
 import argparse
 import os
 import pandas as pd
@@ -6,6 +7,7 @@ import numpy as np
 import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader, Dataset
+
 
 # ---------------------------
 # Dataset definition
@@ -37,6 +39,7 @@ class TimeSeriesDataset(Dataset):
         # Return tensors for PyTorch
         return torch.tensor(x, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)
 
+
 # ---------------------------
 # Model definition
 # ---------------------------
@@ -58,6 +61,7 @@ class LSTM(nn.Module):
         out = self.fc(out)  # shape (batch_size, 1)
         return out
 
+
 # ---------------------------
 # Main training function
 # ---------------------------
@@ -68,6 +72,7 @@ def main():
     parser.add_argument("--train", type=str, default=os.environ.get("SM_CHANNEL_TRAIN"))
     parser.add_argument("--validation", type=str, default=os.environ.get("SM_CHANNEL_VALIDATION"))
     parser.add_argument("--test", type=str, default=os.environ.get("SM_CHANNEL_TEST"))
+    parser.add_argument("--scaler", type=str, default=os.environ.get("SM_CHANNEL_SCALER"))
 
     # Hyperparameters
     parser.add_argument("--seq-len", type=int, default=20)
@@ -86,32 +91,29 @@ def main():
     # Processor wrote "train.csv", "validation.csv", and "test.csv"
     # into the respective directories: /opt/ml/input/data/train, etc.
     train_csv = os.path.join(args.train, "train.csv")
-    val_csv   = os.path.join(args.validation, "validation.csv")
-    test_csv  = os.path.join(args.test, "test.csv")
+    val_csv = os.path.join(args.validation, "validation.csv")
+    test_csv = os.path.join(args.test, "test.csv")
+    scaler_source_path = os.path.join(args.scaler, "scaler.pkl")
 
     train_data = pd.read_csv(train_csv)
-    val_data   = pd.read_csv(val_csv)
-    test_data  = pd.read_csv(test_csv)
+    val_data = pd.read_csv(val_csv)
+    test_data = pd.read_csv(test_csv)
 
     # ---------------------------
     # Create PyTorch datasets & loaders
     # ---------------------------
     train_dataset = TimeSeriesDataset(train_data, seq_len=args.seq_len, pred_len=args.pred_len)
-    val_dataset   = TimeSeriesDataset(val_data, seq_len=args.seq_len, pred_len=args.pred_len)
-    test_dataset  = TimeSeriesDataset(test_data, seq_len=args.seq_len, pred_len=args.pred_len)
+    val_dataset = TimeSeriesDataset(val_data, seq_len=args.seq_len, pred_len=args.pred_len)
+    test_dataset = TimeSeriesDataset(test_data, seq_len=args.seq_len, pred_len=args.pred_len)
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-    val_loader   = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
-    test_loader  = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
     # ---------------------------
     # Initialize model, loss, optimizer
     # ---------------------------
-    model = LSTM(
-        input_size=1,
-        hidden_size=args.hidden_size,
-        num_layers=args.num_layers
-    )
+    model = LSTM(input_size=1, hidden_size=args.hidden_size, num_layers=args.num_layers)
 
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -150,11 +152,13 @@ def main():
                 test_loss += criterion(test_outputs, test_targets).item()
         test_loss /= len(test_loader)
 
-        print(f"Epoch [{epoch+1}/{args.epochs}] "
-              f"TrainLoss: {train_loss:.4f} "
-              f"ValLoss: {val_loss:.4f} "
-              f"TestLoss: {test_loss:.4f}")
-        
+        print(
+            f"Epoch [{epoch + 1}/{args.epochs}] "
+            f"TrainLoss: {train_loss:.4f} "
+            f"ValLoss: {val_loss:.4f} "
+            f"TestLoss: {test_loss:.4f}"
+        )
+
     # ---------------------------
     # Save the model
     # ---------------------------
@@ -163,6 +167,13 @@ def main():
     model_path = os.path.join(model_dir, "model.pt")
     torch.save(model.state_dict(), model_path)
     print(f"Model saved to {model_path}")
+
+    # Copy scaler values to model directory
+    if not os.path.exists(scaler_source_path):
+        raise FileNotFoundError(f"Scaler file not found at {scaler_source_path}")
+    scaler_destination_path = os.path.join(model_dir, "scaler.pkl")
+    shutil.copy(scaler_source_path, scaler_destination_path)
+    print(f"Scaler copied to {scaler_destination_path}")
 
 if __name__ == "__main__":
     main()
