@@ -1,15 +1,19 @@
 # AAI540-final-project
 
 ## Build Instructions
-- Clone the repo
+### Clone the repo
     `git clone <ssh/html link>`
-- Install required libraries
+### Install required libraries
     `pip install -r requirements.txt`
-- Run the `data_generation.ipynb` script
-- Run the `model_pipeline.ipynb` script
-- Run the `endpoint.ipynb` script
+### OpenAQ API Key
+Obtain an API key from OpenAQ by following [this](https://docs.openaq.org/using-the-api/api-key) guide.
+Put your key in a text file called `openaq_api_key.txt` in the `api_keys` directory.
+### Process
+Run the `data_generation.ipynb` script
+Run the `model_pipeline.ipynb` script
+Run the `endpoint.ipynb` script
 
-## Script Descriptions
+## File Descriptions
 ### test_model.ipynb
 This file is not required to run this project. This file was created for initial exploration of the dataset and possible avenues for our LSTM model.
 
