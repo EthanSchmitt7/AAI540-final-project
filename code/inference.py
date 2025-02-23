@@ -1,4 +1,5 @@
 
+import joblib
 import json
 import os
 import time
@@ -31,28 +32,32 @@ class LSTM(nn.Module):
 
 
 def model_fn(model_dir):
+    print("Running model_fn")
     model = LSTM(input_size=1, hidden_size=80, num_layers=2)
     model_path = os.path.join(model_dir, "model.pt")
     model.load_state_dict(torch.load(model_path, map_location=torch.device("cpu")))
     model.eval()
+
+    # Load scaler
+    scaler_path = os.path.join(model_dir, "scaler.pkl")
+    global scaler
+    scaler = joblib.load(scaler_path)
+    
     return model
 
-
 def input_fn(request_body, request_content_type):
+    print("Running input_fn")
     if request_content_type == "application/json":
         data = json.loads(request_body)["data"]
-        inputs = torch.tensor([data], dtype=torch.float32)
+
+        raw_inputs = np.array(data).reshape(-1, 1)
+        scaled_inputs = scaler.transform(raw_inputs)
+        inputs = torch.tensor(scaled_inputs, dtype=torch.float32)
 
         # Log raw input data to CloudWatch
         cloudwatch.put_metric_data(
             Namespace="AirQualityMonitoring",
-            MetricData=[
-                {
-                    "MetricName": "RawQueriedPM25Value",
-                    "Unit": "None",
-                    "Value": data[0]
-                }
-            ]
+            MetricData=[{"MetricName": "RawQueriedPM25Value", "Unit": "None", "Value": data[0]}],
         )
         return inputs
     else:
@@ -60,6 +65,7 @@ def input_fn(request_body, request_content_type):
 
 
 def predict_fn(input_object, model):
+    print("Running predict_fn")
     start_time = time.time()
     with torch.no_grad():
         preds = model(input_object)
@@ -73,34 +79,29 @@ def predict_fn(input_object, model):
             {
                 "MetricName": "InputPM25Value",
                 "Unit": "None",
-                "Value": input_value[0] if isinstance(input_value, list) else input_value
+                "Value": input_value[0] if isinstance(input_value, list) else input_value,
             },
             {
                 "MetricName": "InferenceLatency",
                 "Unit": "Milliseconds",
-                "Value": inference_time * 1000  # Convert to ms
-            }
-        ]
+                "Value": inference_time * 1000,  # Convert to ms
+            },
+        ],
     )
     return preds
 
-
 def output_fn(prediction, response_content_type):
+    print("Running output_fn")
     if response_content_type == "application/json":
-        result = prediction.squeeze().item()
+        scaled_result = prediction.squeeze().item()
+        # Convert prediction to original scale
+        result = scaler.inverse_transform(np.array(scaled_result).reshape(-1, 1)).item()
 
         # Log prediction value
         cloudwatch.put_metric_data(
             Namespace="AirQualityMonitoring",
-            MetricData=[
-                {
-                    "MetricName": "PredictedPM25",
-                    "Unit": "None",
-                    "Value": result
-                }
-            ]
+            MetricData=[{"MetricName": "PredictedPM25", "Unit": "None", "Value": result}],
         )
         return json.dumps({"prediction": result})
     else:
         raise ValueError(f"Unsupported response content type: {response_content_type}")
-
