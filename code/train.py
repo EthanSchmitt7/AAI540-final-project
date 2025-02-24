@@ -175,5 +175,6 @@ def main():
     shutil.copy(scaler_source_path, scaler_destination_path)
     print(f"Scaler copied to {scaler_destination_path}")
 
+
 if __name__ == "__main__":
     main()
