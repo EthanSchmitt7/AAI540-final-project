@@ -42,8 +42,9 @@ def model_fn(model_dir):
     scaler_path = os.path.join(model_dir, "scaler.pkl")
     global scaler
     scaler = joblib.load(scaler_path)
-    
+
     return model
+
 
 def input_fn(request_body, request_content_type):
     print("Running input_fn")
@@ -89,6 +90,7 @@ def predict_fn(input_object, model):
         ],
     )
     return preds
+
 
 def output_fn(prediction, response_content_type):
     print("Running output_fn")
